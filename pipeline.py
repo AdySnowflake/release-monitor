@@ -1,0 +1,64 @@
+import logging
+from pathlib import Path
+
+from downloader import download_file
+from email_parser import extract_text_from_eml
+from github_api import get_release_assets
+from llm import llm_ds, llm_mimo
+from ai_file_selector import select_file
+from ai_url_extractor import parse_release_url
+from repo_rules import get_repo_rules
+
+logger = logging.getLogger(__name__)
+
+
+def run(eml_path: Path) -> dict:
+    """运行流水线：邮件解析 → AI 节点 1 → GitHub API → 规则 → AI 节点 2 → 下载。"""
+    logger.info(f"开始处理: {eml_path.name}")
+
+    # §邮件解析
+    body = extract_text_from_eml(eml_path)
+    if not body:
+        logger.error("邮件正文为空，终止流程")
+        return {"success": 0, "error": "empty_email_body"}
+
+    # §3.1 AI 节点 1 — URL 解析（§5 错误处理：重试 + 备用 LLM + Analysis AI）
+    url_result = parse_release_url(body, llm_mimo, llm_fallback=llm_ds)
+    if url_result.get("success") != 1:
+        logger.warning("AI 节点 1 未能提取 URL")
+        return {"success": 0, "error": "url_extraction_failed"}
+
+    release_url = url_result["release_url"]
+    repo_owner = url_result["repo_owner"]
+    repo_name = url_result["repo_name"]
+    tag = url_result["tag"]
+    full_repo = f"{repo_owner}/{repo_name}"
+
+    logger.info(f"提取成功: {release_url} ({full_repo} @ {tag})")
+
+    # §6 GitHub API — 获取 assets
+    assets = get_release_assets(full_repo, tag)
+    if not assets:
+        logger.error("未获取到任何 assets")
+        return {"success": 0, "error": "no_assets"}
+
+    # §8 Repo 规则 — 加载该仓库的规则
+    rules = get_repo_rules(repo_name)
+
+    # §3.2 AI 节点 2 — 文件选择（§5 错误处理：重试 + 备用 LLM + Analysis AI）
+    file_result = select_file(assets=assets, rules=rules, llm=llm_mimo, llm_fallback=llm_ds)
+    if file_result.get("success") != 1:
+        logger.warning("AI 节点 2 未能选择文件")
+        return {"success": 0, "error": "file_selection_failed"}
+
+    logger.info(f"选择文件: {file_result.get('download_url')}")
+
+    # §7 下载器
+    download_url = file_result["download_url"]
+    filepath = download_file(download_url)
+    if not filepath:
+        logger.error("文件下载失败")
+        return {"success": 0, "error": "download_failed"}
+
+    logger.info(f"下载完成: {filepath}")
+    return {"success": 1, "download_url": download_url, "file": str(filepath)}
