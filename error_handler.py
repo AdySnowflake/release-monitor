@@ -8,7 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_PROMPT = """你是一个错误分析器。AI 节点未能成功完成任务，请分析原因并尝试修正。
+ANALYSIS_PROMPT = """你是一个错误分析器。AI 未能成功完成任务，请分析原因并尝试修正。
 
 原始任务:
 {original_prompt}

@@ -48,21 +48,21 @@ def select_file(
     llm: BaseChatModel,
     llm_fallback: BaseChatModel | None = None,
 ) -> dict:
-    """AI 节点 2：从 assets 列表中选择要下载的文件。"""
+    """选择目标文件：从 assets 列表中选择要下载的文件。"""
     assets_text = "\n".join(
         f"- {a['name']} ({a['size']} bytes, {a['content_type']})\n  url: {a['browser_download_url']}"
         for a in assets
     )
     rules_text = json.dumps(rules, ensure_ascii=False) if rules else "无"
 
-    logger.debug(f"AI 节点 2 输入 - assets: {assets_text}")
-    logger.debug(f"AI 节点 2 输入 - rules: {rules_text}")
-    logger.info("AI 节点 2 开始选择文件...")
+    logger.debug(f"选择目标文件 输入 - assets: {assets_text}")
+    logger.debug(f"选择目标文件 输入 - rules: {rules_text}")
+    logger.info("选择目标文件 开始选择文件...")
     result = run_with_analysis(
         build_chain,
         {"assets": assets_text, "rules": rules_text},
         llm,
         llm_fallback,
     )
-    logger.info(f"AI 节点 2 输出: {json.dumps(result, ensure_ascii=False)}")
+    logger.info(f"选择目标文件 输出: {json.dumps(result, ensure_ascii=False)}")
     return result

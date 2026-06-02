@@ -42,9 +42,9 @@ def parse_release_url(
     llm: BaseChatModel,
     llm_fallback: BaseChatModel | None = None,
 ) -> dict:
-    """AI 节点 1：从邮件正文中提取 GitHub Release URL 和仓库信息。"""
-    logger.debug(f"AI 节点 1 输入: {email_body[:500]}...")
-    logger.info("AI 节点 1 开始解析...")
+    """提取 Release URL：从邮件正文中提取 GitHub Release URL 和仓库信息。"""
+    logger.debug(f"提取 Release URL 输入: {email_body[:500]}...")
+    logger.info("提取 Release URL 开始解析...")
     result = run_with_analysis(build_chain, {"email_body": email_body}, llm, llm_fallback)
-    logger.info(f"AI 节点 1 输出: {json.dumps(result, ensure_ascii=False)}")
+    logger.info(f"提取 Release URL 输出: {json.dumps(result, ensure_ascii=False)}")
     return result

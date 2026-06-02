@@ -10,12 +10,12 @@
                                     AI 根据 repo_rules 选择文件 → 下载到 downloads/
 ```
 
-### 双节点 AI 架构
+### AI 架构
 
-| 节点 | 作用 | 主模型 | 备用模型 |
+| 步骤 | 作用 | 主模型 | 备用模型 |
 |------|------|--------|----------|
-| Node 1 | 从邮件正文提取 repo、版本、URL | MiMo-7B-RL | DeepSeek Chat |
-| Node 2 | 根据规则从资源列表中选择文件 | MiMo-7B-RL | DeepSeek Chat |
+| 提取 Release URL | 从邮件正文提取 repo、版本、URL | MiMo-7B-RL | DeepSeek Chat |
+| 选择目标文件 | 根据规则从资源列表中选择文件 | MiMo-7B-RL | DeepSeek Chat |
 
 每个 AI 调用都有三层容错：指数退避重试 → 自动切换备用 LLM → Analysis AI 诊断修复。
 
@@ -34,7 +34,7 @@ cp repo_rules.example.json repo_rules.json
 # 编辑 repo_rules.json 添加你需要监控的仓库
 
 # 4. 运行
-.venv/Scripts/python main.py
+python main.py
 ```
 
 ## 配置说明
@@ -84,12 +84,12 @@ cp repo_rules.example.json repo_rules.json
 
 ```
 main.py                 # 入口：设置日志、读取 .eml、调用 pipeline
-pipeline.py             # 编排：邮件 → AI1 → GitHub API → 规则 → AI2 → 下载
+pipeline.py             # 编排：邮件 → 提取 Release URL → GitHub API → 规则 → 选择文件 → 下载
 config.py               # 加载 .env 配置
 llm.py                  # 创建 LLM 实例（DeepSeek + MiMo）
 email_parser.py         # 解析 .eml 邮件正文
-ai_url_extractor.py     # AI Node 1：从邮件提取 Release 信息
-ai_file_selector.py     # AI Node 2：根据规则选择文件
+ai_url_extractor.py     # 从邮件提取 Release 信息
+ai_file_selector.py     # 根据规则选择目标文件
 github_api.py           # 调用 GitHub Releases API
 repo_rules.py           # 加载并匹配仓库规则
 repo_rules.json         # 个人仓库规则（Git 忽略）
