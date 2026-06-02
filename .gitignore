@@ -6,3 +6,4 @@ downloads/
 logs/
 .omc/
 *.eml
+repo_rules.json

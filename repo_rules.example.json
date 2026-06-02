@@ -1,0 +1,13 @@
+{
+  "ExampleApp": {
+    "extension": ".apk",
+    "include": ["arm64-v8a"]
+  },
+  "AnotherApp": {
+    "extension": ".ipa"
+  },
+  "DesktopTool": {
+    "extension": ".exe",
+    "exclude": ["legacy", "portable"]
+  }
+}
