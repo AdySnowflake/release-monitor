@@ -91,6 +91,11 @@ error_handler.py        # 重试、回退、AI 诊断
 - Requests
 - python-dotenv
 
+## TODO
+
+- [ ] 记录已下载版本号，定时自动检查新版本
+- [ ] 接入邮件服务，自动拉取 Release 通知
+
 ## 许可证
 
 [MIT License](LICENSE)
