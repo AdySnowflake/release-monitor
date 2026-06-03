@@ -12,12 +12,9 @@
 
 ### AI 架构
 
-| 步骤 | 作用 | 主模型 | 备用模型 |
-|------|------|--------|----------|
-| 提取 Release URL | 从邮件正文提取 repo、版本、URL | MiMo-7B-RL | DeepSeek Chat |
-| 选择目标文件 | 根据规则从资源列表中选择文件 | MiMo-7B-RL | DeepSeek Chat |
+每个 AI 调用都有三层容错：指数退避重试 → 自动切换 LLM → Analysis AI 诊断修复。
 
-每个 AI 调用都有三层容错：指数退避重试 → 自动切换备用 LLM → Analysis AI 诊断修复。
+LLM 配置在 `.env` 中，支持任何 OpenAI 兼容 API。
 
 ## 快速开始
 
@@ -38,17 +35,6 @@ python main.py
 ```
 
 ## 配置说明
-
-### 环境变量 (.env)
-
-| 变量 | 说明 |
-|------|------|
-| `DEEPSEEK_API_KEY` | DeepSeek API Key（备用 LLM） |
-| `DEEPSEEK_BASE_URL` | DeepSeek API 地址 |
-| `DEEPSEEK_MODEL` | DeepSeek 模型名称 |
-| `MIMO_API_KEY` | MiMo API Key（主 LLM） |
-| `MIMO_BASE_URL` | MiMo API 地址 |
-| `MIMO_MODEL` | MiMo 模型名称 |
 
 ### 仓库规则 (repo_rules.json)
 
@@ -104,3 +90,7 @@ error_handler.py        # 重试、回退、AI 诊断
 - LangChain + LangChain-OpenAI
 - Requests
 - python-dotenv
+
+## 许可证
+
+[MIT License](LICENSE)
