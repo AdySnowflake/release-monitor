@@ -33,17 +33,9 @@ def download_file(url: str, download_dir: Path | None = None) -> Path | None:
     resp = requests.get(url, stream=True)
     resp.raise_for_status()
 
-    total = int(resp.headers.get("content-length", 0))
-    downloaded = 0
-
     with open(filepath, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
-            downloaded += len(chunk)
-            if total > 0:
-                pct = downloaded / total * 100
-                print(f"\r下载进度: {pct:.1f}% ({downloaded}/{total})", end="", flush=True)
 
-    print()
     logger.info(f"下载完成: {filepath}")
     return filepath

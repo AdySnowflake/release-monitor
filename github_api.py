@@ -15,7 +15,7 @@ def get_release_assets(repo_name: str, tag: str) -> list[dict]:
         tag: 版本标签，如 "v4.7.5"
 
     Returns:
-        list[dict]: [{ name, size, content_type, browser_download_url }]
+        list[dict]: GitHub API 原始 asset 对象列表
     """
     url = f"{GITHUB_API}/repos/{repo_name}/releases/tags/{tag}"
     logger.info(f"请求 GitHub API: {url}")
@@ -30,15 +30,7 @@ def get_release_assets(repo_name: str, tag: str) -> list[dict]:
     resp.raise_for_status()
 
     data = resp.json()
-    assets = [
-        {
-            "name": a["name"],
-            "size": a["size"],
-            "content_type": a["content_type"],
-            "browser_download_url": a["browser_download_url"],
-        }
-        for a in data.get("assets", [])
-    ]
+    assets = data.get("assets", [])
 
     logger.info(f"获取到 {len(assets)} 个 assets")
     return assets

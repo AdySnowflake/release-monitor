@@ -70,9 +70,9 @@ cp repo_rules.example.json repo_rules.json
 
 ```
 main.py                 # 入口：设置日志、读取 .eml、调用 pipeline
-pipeline.py             # 编排：邮件 → 提取 Release URL → GitHub API → 规则 → 选择文件 → 下载
-config.py               # 加载 .env 配置
-llm.py                  # 创建 LLM 实例（DeepSeek + MiMo）
+pipeline.py             # 编排：邮件 → 提取 Release URL → GitHub API → 规则 → 选择文件 → 下载（含步骤日志）
+config.py               # 项目设置（下载目录、主模型、fallback 模型）
+llms.py                 # LLM Provider 定义（_make_llm 工厂 + 实例）
 email_parser.py         # 解析 .eml 邮件正文
 ai_url_extractor.py     # 从邮件提取 Release 信息
 ai_file_selector.py     # 根据规则选择目标文件

@@ -1,13 +1,8 @@
-import json
-import logging
-
 from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from error_handler import run_with_analysis
-
-logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """你是一个 GitHub Release URL 提取器。从用户提供的邮件内容中提取 GitHub Release 信息。
 
@@ -43,8 +38,4 @@ def parse_release_url(
     llm_fallback: BaseChatModel | None = None,
 ) -> dict:
     """提取 Release URL：从邮件正文中提取 GitHub Release URL 和仓库信息。"""
-    logger.debug(f"提取 Release URL 输入: {email_body[:500]}...")
-    logger.info("提取 Release URL 开始解析...")
-    result = run_with_analysis(build_chain, {"email_body": email_body}, llm, llm_fallback)
-    logger.info(f"提取 Release URL 输出: {json.dumps(result, ensure_ascii=False)}")
-    return result
+    return run_with_analysis(build_chain, {"email_body": email_body}, llm, llm_fallback)

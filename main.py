@@ -1,6 +1,7 @@
 import json
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
@@ -15,8 +16,9 @@ def setup_logging():
 
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s - %(message)s")
 
-    # 文件处理器（UTF-8，DEBUG 级别）
-    file_handler = logging.FileHandler(log_dir / "pipeline.log", encoding="utf-8")
+    # 文件处理器（UTF-8，DEBUG 级别，带时间戳的文件名）
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_handler = logging.FileHandler(log_dir / f"pipeline_{timestamp}.log", encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(fmt)
 
