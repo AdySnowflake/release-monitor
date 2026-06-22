@@ -22,6 +22,13 @@ HTTPS_PROXY = os.getenv("HTTPS_PROXY")
 LLM_PRIMARY = "llm_mimo"
 LLM_FALLBACK = "llm_ds"
 
+# 待办模块（下载完成后自动创建待办，可选）
+TODO_ENABLED = os.getenv("TODO_ENABLED", "false").lower() == "true"
+
+# TickTick API（启用 TODO_ENABLED 后必填）
+TICKTICK_ACCESS_TOKEN = os.getenv("TICKTICK_ACCESS_TOKEN")
+TICKTICK_PROJECT_ID = os.getenv("TICKTICK_PROJECT_ID")
+
 
 def get_proxies() -> dict | None:
     """返回 requests 的 proxies 参数，未配置时返回 None。"""

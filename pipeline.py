@@ -8,8 +8,10 @@ from github_api import get_release_assets
 from ai_file_selector import select_file
 from ai_url_extractor import parse_release_url
 from repo_rules import get_repo_rules
+from todo import create_todo
 
 import llms
+import config
 from config import LLM_PRIMARY, LLM_FALLBACK
 
 logger = logging.getLogger(__name__)
@@ -106,6 +108,11 @@ def _process_release_assets(owner: str, repo: str, tag: str, primary, fallback, 
             step.log("下载失败")
             return {"success": 0, "error": "download_failed"}
         step.log(f"→ {filepath}")
+
+    # 创建待办（可选）
+    if getattr(config, "TODO_ENABLED", False):
+        if not create_todo(repo, tag):
+            logger.warning("待办创建未成功，但不影响下载结果")
 
     logger.info(f"流程完成: {total_steps}/{total_steps} 步骤成功")
     return {"success": 1, "download_url": download_url, "file": str(filepath)}

@@ -13,6 +13,8 @@
 API 模式: repo_rules 遍历 → GitHub API 检查新版本 → 获取资源列表
                                                                     ↓
                                                 AI 根据 repo_rules 选择文件 → 下载到 downloads/
+                                                                                 ↓
+                                                                   创建 TickTick 待办（可选）
 ```
 
 ### AI 架构
@@ -71,6 +73,11 @@ DOWNLOAD_DIR = Path(__file__).parent / "downloads"
 # LLM 设置
 LLM_PRIMARY = "llm_mimo"
 LLM_FALLBACK = "llm_ds"
+
+# 待办模块（可选）
+TODO_ENABLED = False
+TICKTICK_ACCESS_TOKEN = os.getenv("TICKTICK_ACCESS_TOKEN")
+TICKTICK_PROJECT_ID = os.getenv("TICKTICK_PROJECT_ID")
 ```
 
 首次使用可从示例文件复制：
@@ -176,6 +183,7 @@ repo_rules.py           # 加载并匹配仓库规则（含版本跟踪）
 repo_rules.json         # 个人仓库规则（Git 忽略）
 repo_rules.example.json # 规则示例文件
 downloader.py           # 下载文件（进度条 + 去重）
+todo.py                 # 创建 TickTick 待办（可选）
 error_handler.py        # 重试、回退、AI 诊断
 ```
 
