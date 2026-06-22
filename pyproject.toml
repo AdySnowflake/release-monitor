@@ -1,6 +1,6 @@
 [project]
 name = "release-monitor"
-version = "0.1.0"
+version = "1.0.0"
 description = "监控 GitHub Release 邮件通知，通过 AI 自动筛选并下载对应平台的发布文件"
 readme = "README.md"
 requires-python = ">=3.12"

@@ -7,3 +7,5 @@ logs/
 .omc/
 *.eml
 repo_rules.json
+config.py
+emails/

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import requests
 
-from config import DOWNLOAD_DIR
+from config import DOWNLOAD_DIR, get_proxies
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def download_file(url: str, download_dir: Path | None = None) -> Path | None:
         return filepath
 
     logger.info(f"开始下载: {url}")
-    resp = requests.get(url, stream=True)
+    resp = requests.get(url, stream=True, proxies=get_proxies())
     resp.raise_for_status()
 
     with open(filepath, "wb") as f:
