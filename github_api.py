@@ -2,7 +2,7 @@ import logging
 
 import requests
 
-from config import get_proxies
+from config import get_github_headers, get_proxies
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,12 @@ def get_release_assets(repo_name: str, tag: str) -> list[dict]:
     url = f"{GITHUB_API}/repos/{repo_name}/releases/tags/{tag}"
     logger.info(f"请求 GitHub API: {url}")
 
-    resp = requests.get(url, headers={"Accept": "application/vnd.github+json"}, proxies=get_proxies())
+    resp = requests.get(
+        url,
+        headers=get_github_headers(),
+        proxies=get_proxies(),
+        timeout=10,
+    )
     if resp.status_code == 404:
         logger.error(f"Release 不存在: {repo_name} @ {tag}")
         return []

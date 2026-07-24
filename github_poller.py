@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import requests
 
 from repo_rules import load_rules, get_last_tag
-from config import get_proxies
+from config import get_github_headers, get_proxies
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,12 @@ def _check_repo(owner: str, repo: str) -> ReleaseInfo | None:
     logger.info(f"检查仓库: {owner}/{repo}")
 
     try:
-        resp = requests.get(url, headers={"Accept": "application/vnd.github+json"}, timeout=10, proxies=get_proxies())
+        resp = requests.get(
+            url,
+            headers=get_github_headers(),
+            timeout=10,
+            proxies=get_proxies(),
+        )
         if resp.status_code == 404:
             logger.warning(f"仓库 {owner}/{repo} 无 release")
             return None

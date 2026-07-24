@@ -5,18 +5,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# 运行模式: "email" | "api"
-MODE = "api"
-
-# 邮件扫描目录（仅 email 模式）
-EMAIL_DIR = "./emails/"
-
 # 下载目录
 DOWNLOAD_DIR = Path(__file__).parent / "downloads"
 
 # 代理设置（从 .env 读取，可选）
 HTTP_PROXY = os.getenv("HTTP_PROXY")
 HTTPS_PROXY = os.getenv("HTTPS_PROXY")
+
+# GitHub API Token（可选；未配置时使用匿名请求）
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 # LLM 设置：指定主模型和 fallback 模型（对应 llms.py 中的变量名）
 LLM_PRIMARY = "llm_mimo"
@@ -35,3 +32,14 @@ def get_proxies() -> dict | None:
     if HTTP_PROXY or HTTPS_PROXY:
         return {"http": HTTP_PROXY, "https": HTTPS_PROXY}
     return None
+
+
+def get_github_headers() -> dict[str, str]:
+    """返回 GitHub API 请求头，配置 Token 时自动启用认证。"""
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    return headers

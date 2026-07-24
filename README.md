@@ -1,103 +1,97 @@
 # release-monitor
 
-监控 GitHub Release，通过 AI 自动筛选并下载对应平台的发布文件。
-
-支持两种运行模式：
-- **邮件模式**：扫描 `.eml` 文件，解析邮件获取 Release 信息
-- **API 模式**：直接通过 GitHub API 检查仓库新版本
+通过 GitHub API 监控仓库的最新 Release，按仓库规则选择对应平台的发布文件并下载。
 
 ## 工作流程
 
+```text
+repo_rules.json
+       ↓
+GitHub API 检查最新 Release
+       ↓
+与 last_tag 比较
+       ↓
+AI 根据仓库规则选择 asset
+       ↓
+下载到 downloads/
+       ↓
+创建 TickTick 待办（可选）
 ```
-邮件模式: .eml 邮件 → 解析正文 → AI 提取 Release 信息 → GitHub API 获取资源列表
-API 模式: repo_rules 遍历 → GitHub API 检查新版本 → 获取资源列表
-                                                                    ↓
-                                                AI 根据 repo_rules 选择文件 → 下载到 downloads/
-                                                                                 ↓
-                                                                   创建 TickTick 待办（可选）
-```
 
-### AI 架构
-
-每个 AI 调用都有三层容错：指数退避重试 → 自动切换 LLM → Analysis AI 诊断修复。
-
-LLM 配置在 `.env` 中，支持任何 OpenAI 兼容 API。
+每次运行会遍历 `repo_rules.json` 中的仓库。发现新版本后，程序获取 Release assets，按照 `extension`、`include` 和 `exclude` 规则选择文件并下载。
 
 ## 快速开始
 
 ```bash
 # 1. 配置环境变量
 cp .env.example .env
-# 编辑 .env 填入 API Key
+# 编辑 .env，填写 LLM API Key、模型名等
 
 # 2. 安装依赖
 uv sync
 
 # 3. 配置业务参数
 cp config.example.py config.py
-# 编辑 config.py 设置运行模式（MODE）等
 
-# 4. 配置下载规则
+# 4. 配置监控仓库
 cp repo_rules.example.json repo_rules.json
-# 编辑 repo_rules.json 添加你需要监控的仓库
+# 编辑 repo_rules.json
 
 # 5. 运行
 python main.py
 ```
 
-## 配置说明
+## 配置
 
-### 环境变量 (.env) vs 业务配置 (config.py)
+### 环境变量
 
-| 维度 | `.env` | `config.py` |
-|------|--------|-------------|
-| **存放内容** | 敏感信息（API Key、Token） | 业务配置（模式、目录、超时） |
-| **是否提交 Git** | ❌ 不提交 | ❌ 不提交（仅提交 `config.example.py`） |
-| **示例** | `MIMO_API_KEY=xxx` | `MODE = "api"` |
-| **加载方式** | `python-dotenv` | 直接 `import config` |
+`.env` 用于存放 API Key、Token 等敏感信息：
 
-**原则**：泄露会造成安全风险 → `.env`；否则 → `config.py`。
+```dotenv
+MIMO_BASE_URL=https://api.example.com/v1
+MIMO_API_KEY=your-key
+MIMO_MODEL=your-model
 
-### 业务配置 (config.py)
-
-```python
-# 运行模式: "email" | "api"
-MODE = "api"
-
-# 邮件扫描目录（仅 email 模式）
-EMAIL_DIR = "./emails/"
-
-# 下载目录
-DOWNLOAD_DIR = Path(__file__).parent / "downloads"
-
-# LLM 设置
-LLM_PRIMARY = "llm_mimo"
-LLM_FALLBACK = "llm_ds"
-
-# 待办模块（可选）
-TODO_ENABLED = False
-TICKTICK_ACCESS_TOKEN = os.getenv("TICKTICK_ACCESS_TOKEN")
-TICKTICK_PROJECT_ID = os.getenv("TICKTICK_PROJECT_ID")
+DS_BASE_URL=https://api.example.com/v1
+DS_API_KEY=your-key
+DS_MODEL=your-fallback-model
 ```
 
-首次使用可从示例文件复制：
+可选配置：
+
+```dotenv
+# 配置后使用认证请求；不配置则使用匿名请求
+GITHUB_TOKEN=github_pat_your-token
+
+HTTP_PROXY=http://127.0.0.1:7890
+HTTPS_PROXY=http://127.0.0.1:7890
+
+TODO_ENABLED=true
+TICKTICK_ACCESS_TOKEN=your-access-token
+TICKTICK_PROJECT_ID=your-project-id
+```
+
+`GITHUB_TOKEN` 不是必填项。未配置时使用 GitHub 匿名 API；配置后自动在请求中添加 Bearer Token。
+
+### 业务配置
+
+`config.py` 管理下载目录、LLM 选择和 TickTick 开关。首次使用时从示例复制：
 
 ```bash
 cp config.example.py config.py
 ```
 
-### 仓库规则 (repo_rules.json)
+### 仓库规则
 
-`repo_rules.json` 包含你的个人下载偏好，**不会被提交到 Git**。
-
-格式示例：
+`repo_rules.json` 是监控清单，不提交到 Git：
 
 ```json
 {
   "owner/repo": {
     "extension": ".apk",
     "include": ["arm64-v8a"],
-    "exclude": ["legacy"]
+    "exclude": ["legacy"],
+    "last_tag": "v1.0.0"
   }
 }
 ```
@@ -107,84 +101,54 @@ cp config.example.py config.py
 | `extension` | string | 目标文件扩展名，如 `.apk`、`.ipa`、`.exe` |
 | `include` | string[] | 文件名必须包含的关键词 |
 | `exclude` | string[] | 文件名不能包含的关键词 |
+| `last_tag` | string | 最后成功处理的 Release tag，由程序自动更新 |
 
-所有字段均可选，规则会作为约束传给 AI 文件选择器。
-
-首次使用可从示例文件复制：
+`extension`、`include` 和 `exclude` 均可省略。首次使用时从示例复制：
 
 ```bash
 cp repo_rules.example.json repo_rules.json
 ```
 
-## 运行模式
+仓库名必须使用 `owner/repo` 格式。
 
-### 邮件模式 (MODE = "email")
-
-扫描指定目录中的 `.eml` 文件，解析邮件获取 Release 信息并下载。
+编辑完成后，可以按仓库名（`/` 后面的部分）进行不区分大小写的排序：
 
 ```bash
-# 设置 config.py 中 MODE = "email"
-python main.py
+python sort_repo_rules.py
 ```
 
-### API 模式 (MODE = "api")
+脚本固定处理项目目录下的 `repo_rules.json`，只调整仓库条目的顺序，不会修改各仓库的规则内容。
 
-遍历 `repo_rules.json` 中的仓库，通过 GitHub API 检查新版本并下载。
+## 定时运行
 
-```bash
-# 设置 config.py 中 MODE = "api"
-python main.py
-```
+程序执行一轮检查后退出，可交给 cron 或系统任务计划定时调用。
 
-**注意**：API 模式需要 `repo_rules.json` 中的仓库使用 `owner/repo` 格式。
-
-## 定时调度
-
-程序单次执行完毕后退出，可通过外部定时任务实现自动调度。
-
-### Windows 任务计划
-
-1. 打开「任务计划程序」
-2. 创建基本任务
-3. 设置触发器（如每小时）
-4. 操作：启动程序
-   - 程序：`python`
-   - 参数：`main.py`
-   - 起始目录：`E:\dev\release-monitor`
-
-### Linux/macOS (cron)
+Linux/macOS 示例：
 
 ```bash
-# 编辑 crontab
-crontab -e
-
-# 每小时运行一次（API 模式）
+# 每小时运行
 0 * * * * cd /path/to/release-monitor && python main.py
 
-# 每 15 分钟运行一次（API 模式）
+# 每 15 分钟运行
 */15 * * * * cd /path/to/release-monitor && python main.py
 ```
 
 ## 项目结构
 
-```
-main.py                 # 入口：根据 config.MODE 分发到不同执行路径
-pipeline.py             # 编排：邮件模式完整流程 / API 模式跳过邮件解析
-config.py               # 业务配置（运行模式、目录、LLM 设置）
-config.example.py       # 配置示例（提交到 Git）
-email_scanner.py        # 扫描目录中的 .eml 文件
-github_poller.py        # 遍历仓库检查新 release
+```text
+main.py                 # 程序入口
+github_poller.py        # 遍历监控仓库并检查最新 Release
+pipeline.py             # 资产选择、下载和待办编排
+github_api.py           # GitHub Releases API
+repo_rules.py           # 加载仓库规则并维护 last_tag
+sort_repo_rules.py      # 按仓库名整理监控规则
+ai_file_selector.py     # 根据规则选择 Release asset
 llms.py                 # LLM Provider 定义
-email_parser.py         # 解析 .eml 邮件正文
-ai_url_extractor.py     # 从邮件提取 Release 信息
-ai_file_selector.py     # 根据规则选择目标文件
-github_api.py           # 调用 GitHub Releases API
-repo_rules.py           # 加载并匹配仓库规则（含版本跟踪）
-repo_rules.json         # 个人仓库规则（Git 忽略）
-repo_rules.example.json # 规则示例文件
-downloader.py           # 下载文件（进度条 + 去重）
-todo.py                 # 创建 TickTick 待办（可选）
-error_handler.py        # 重试、回退、AI 诊断
+error_handler.py        # LLM 重试、回退和结果修复
+downloader.py           # 文件下载
+todo.py                 # TickTick 待办（可选）
+config.example.py       # 业务配置示例
+repo_rules.example.json # 监控规则示例
 ```
 
 ## 依赖

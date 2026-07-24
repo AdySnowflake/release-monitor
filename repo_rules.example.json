@@ -2,6 +2,7 @@
   "owner/repo-name": {
     "extension": ".apk",
     "include": ["arm64-v8a"],
-    "exclude": []
+    "exclude": [],
+    "last_tag": null
   }
 }

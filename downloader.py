@@ -29,13 +29,26 @@ def download_file(url: str, download_dir: Path | None = None) -> Path | None:
         logger.info(f"文件已存在: {filepath}")
         return filepath
 
+    temp_filepath = filepath.with_name(f"{filepath.name}.part")
     logger.info(f"开始下载: {url}")
-    resp = requests.get(url, stream=True, proxies=get_proxies())
-    resp.raise_for_status()
+    try:
+        with requests.get(
+            url,
+            stream=True,
+            proxies=get_proxies(),
+            timeout=(10, 60),
+        ) as resp:
+            resp.raise_for_status()
 
-    with open(filepath, "wb") as f:
-        for chunk in resp.iter_content(chunk_size=8192):
-            f.write(chunk)
+            with open(temp_filepath, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+        temp_filepath.replace(filepath)
+    except Exception:
+        temp_filepath.unlink(missing_ok=True)
+        raise
 
     logger.info(f"下载完成: {filepath}")
     return filepath

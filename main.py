@@ -7,11 +7,9 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
 sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
 
-from pipeline import run, run_release
-from email_scanner import scan_emails
+from pipeline import run_release
 from github_poller import check_new_releases
 from repo_rules import update_repo_tag
-import config
 
 
 def setup_logging():
@@ -43,45 +41,8 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    mode = getattr(config, "MODE", None)
-
-    if mode == "email":
-        _run_email_mode()
-    elif mode == "api":
-        _run_api_mode()
-    else:
-        logger.error(f"无效的 MODE 配置: {mode!r}，请在 config.py 中设置 MODE = 'email' 或 'api'")
-        sys.exit(1)
-
-
-def _run_email_mode():
-    """邮件模式：扫描目录中的 .eml 文件并处理。"""
-    email_dir = Path(getattr(config, "EMAIL_DIR", "./emails/"))
-    logger.info(f"邮件模式，扫描目录: {email_dir}")
-
-    eml_files = scan_emails(email_dir)
-    if not eml_files:
-        logger.info("未发现 .eml 文件")
-        return
-
-    logger.info(f"发现 {len(eml_files)} 个 .eml 文件")
-
-    for eml_path in eml_files:
-        try:
-            logger.info(f"处理: {eml_path.name}")
-            result = run(eml_path)
-            print(json.dumps(result, ensure_ascii=False, indent=2))
-
-            # 处理完成后删除 .eml 文件
-            eml_path.unlink()
-            logger.info(f"已删除: {eml_path.name}")
-        except Exception as e:
-            logger.error(f"处理 {eml_path.name} 失败: {e}", exc_info=True)
-
-
-def _run_api_mode():
-    """API 模式：遍历仓库检查新 release 并处理。"""
-    logger.info("API 模式，检查仓库新 release")
+    """遍历仓库，通过 GitHub API 检查并处理新 release。"""
+    logger.info("检查 GitHub 仓库的新 release")
 
     new_releases = check_new_releases()
     if not new_releases:
@@ -96,8 +57,13 @@ def _run_api_mode():
             result = run_release(release.owner, release.repo, release.tag, release.assets)
             print(json.dumps(result, ensure_ascii=False, indent=2))
 
-            # 更新 last_tag（无论成功失败，避免永久失败无限重试）
-            update_repo_tag(release.owner, release.repo, release.tag)
+            if result.get("success") == 1:
+                update_repo_tag(release.owner, release.repo, release.tag)
+            else:
+                logger.error(
+                    f"处理 {release.owner}/{release.repo} @ {release.tag} 未成功，"
+                    "保留 last_tag 以便下次重试"
+                )
         except Exception as e:
             logger.error(f"处理 {release.owner}/{release.repo} 失败: {e}", exc_info=True)
 
