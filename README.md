@@ -16,6 +16,8 @@ AI 根据仓库规则选择 asset
 下载到 downloads/
        ↓
 创建 TickTick 待办（可选）
+       ↓
+移动到指定目录（可选）
 ```
 
 每次运行会遍历 `repo_rules.json` 中的仓库。发现新版本后，程序获取 Release assets，按照 `extension`、`include` 和 `exclude` 规则选择文件并下载。
@@ -48,13 +50,17 @@ python main.py
 `.env` 用于存放 API Key、Token 等敏感信息：
 
 ```dotenv
-MIMO_BASE_URL=https://api.example.com/v1
-MIMO_API_KEY=your-key
-MIMO_MODEL=your-model
+LLM_PRIMARY_BASE_URL=https://api.example.com/v1
+LLM_PRIMARY_API_KEY=your-key
+LLM_PRIMARY_MODEL=your-model
+```
 
-DS_BASE_URL=https://api.example.com/v1
-DS_API_KEY=your-key
-DS_MODEL=your-fallback-model
+备用模型为可选配置，需要时填写对应环境变量：
+
+```dotenv
+LLM_FALLBACK_BASE_URL=https://api.example.com/v1
+LLM_FALLBACK_API_KEY=your-key
+LLM_FALLBACK_MODEL=your-fallback-model
 ```
 
 可选配置：
@@ -69,17 +75,24 @@ HTTPS_PROXY=http://127.0.0.1:7890
 TODO_ENABLED=true
 TICKTICK_ACCESS_TOKEN=your-access-token
 TICKTICK_PROJECT_ID=your-project-id
+
+# 配置后在 TickTick 处理完成后移动下载文件
+MOVE_TARGET_DIR=/path/to/target
 ```
 
 `GITHUB_TOKEN` 不是必填项。未配置时使用 GitHub 匿名 API；配置后自动在请求中添加 Bearer Token。
 
 ### 业务配置
 
-`config.py` 管理下载目录、LLM 选择和 TickTick 开关。首次使用时从示例复制：
+`config.py` 管理下载目录、文件转移目录和 TickTick 开关。首次使用时从示例复制：
 
 ```bash
 cp config.example.py config.py
 ```
+
+具体 Provider 只在 `.env` 中配置，不需要修改项目代码。程序在使用时才初始化
+主模型；填写任意 `LLM_FALLBACK_*` 配置后，备用模型也只会在主模型调用失败时
+初始化。
 
 ### 仓库规则
 
@@ -143,10 +156,10 @@ github_api.py           # GitHub Releases API
 repo_rules.py           # 加载仓库规则并维护 last_tag
 sort_repo_rules.py      # 按仓库名整理监控规则
 ai_file_selector.py     # 根据规则选择 Release asset
-llms.py                 # LLM Provider 定义
-error_handler.py        # LLM 重试、回退和结果修复
+llms.py                 # 通用 LLM 客户端创建
 downloader.py           # 文件下载
 ticktick.py             # TickTick 待办（可选）
+file_transfer.py        # 下载文件转移（可选）
 config.example.py       # 业务配置示例
 repo_rules.example.json # 监控规则示例
 ```

@@ -2,14 +2,13 @@ import json
 import logging
 
 from downloader import download_file
+from file_transfer import move_downloaded_file
 from github_api import get_release_assets
 from ai_file_selector import select_file
 from repo_rules import get_repo_rules
 from ticktick import create_todo
 
-import llms
 import config
-from config import LLM_PRIMARY, LLM_FALLBACK
 
 logger = logging.getLogger(__name__)
 
@@ -40,21 +39,10 @@ class StepLogger:
         self.lines.append(text)
 
 
-def _get_llm_clients():
-    """获取 LLM 客户端配置。"""
-    primary_llm = getattr(llms, LLM_PRIMARY, None)
-    fallback_llm = getattr(llms, LLM_FALLBACK, None)
-    if not primary_llm or not fallback_llm:
-        raise ValueError(f"LLM 配置错误: LLM_PRIMARY={LLM_PRIMARY!r}, LLM_FALLBACK={LLM_FALLBACK!r}，请检查 config.py 和 llms.py")
-    return primary_llm.client, fallback_llm.client
-
-
 def _process_release_assets(
     owner: str,
     repo: str,
     tag: str,
-    primary,
-    fallback,
     assets: list[dict] | None = None,
 ) -> dict:
     """选择并下载 release asset。
@@ -63,8 +51,6 @@ def _process_release_assets(
         owner: 仓库所有者
         repo: 仓库名称
         tag: 版本标签
-        primary: 主 LLM 客户端
-        fallback: 备用 LLM 客户端
         assets: 预获取的 assets 列表，为 None 时从 API 获取
 
     Returns:
@@ -96,7 +82,7 @@ def _process_release_assets(
 
     # [3/4] AI 选择文件
     with StepLogger(3, total_steps, "AI 选择文件") as step:
-        file_result = select_file(assets=assets, rules=rules, llm=primary, llm_fallback=fallback)
+        file_result = select_file(assets=assets, rules=rules)
         step.log(json.dumps(file_result, ensure_ascii=False, indent=2))
         if file_result.get("success") != 1:
             return {"success": 0, "error": "file_selection_failed"}
@@ -125,8 +111,20 @@ def _process_release_assets(
         if not create_todo(repo, tag):
             logger.warning("待办创建未成功，但不影响下载结果")
 
+    # 转移下载文件（可选，位于 TickTick 处理之后）
+    final_filepath = filepath
+    if config.MOVE_TARGET_DIR:
+        moved_path = move_downloaded_file(filepath, config.MOVE_TARGET_DIR)
+        if not moved_path:
+            return {
+                "success": 0,
+                "error": "file_transfer_failed",
+                "file": str(filepath),
+            }
+        final_filepath = moved_path
+
     logger.info(f"流程完成: {total_steps}/{total_steps} 步骤成功")
-    return {"success": 1, "download_url": download_url, "file": str(filepath)}
+    return {"success": 1, "download_url": download_url, "file": str(final_filepath)}
 
 
 def run_release(owner: str, repo: str, tag: str, assets: list[dict] | None = None) -> dict:
@@ -141,8 +139,6 @@ def run_release(owner: str, repo: str, tag: str, assets: list[dict] | None = Non
     Returns:
         处理结果字典
     """
-    primary, fallback = _get_llm_clients()
-
     logger.info(f"开始处理 API release: {owner}/{repo} @ {tag}")
 
-    return _process_release_assets(owner, repo, tag, primary, fallback, assets=assets)
+    return _process_release_assets(owner, repo, tag, assets=assets)

@@ -1,8 +1,7 @@
-"""LLM Provider 定义。
+"""按用途惰性创建 OpenAI 兼容的 LLM 客户端。"""
 
-新增 provider 只需在下方添加一个 LLM 实例。
-"""
 import os
+from functools import lru_cache
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -10,43 +9,44 @@ from pydantic import SecretStr
 
 load_dotenv()
 
-
-class LLM:
-    """LLM 配置与实例。"""
-
-    def __init__(self, base_url: str, api_key: str, model: str):
-        self.base_url = base_url
-        self.api_key = api_key
-        self.model = model
-        self._client = ChatOpenAI(
-            model=model,
-            base_url=base_url,
-            api_key=SecretStr(api_key),
-            temperature=0,
-        )
-
-    @property
-    def client(self) -> ChatOpenAI:
-        return self._client
+LLM_ROLES = {"primary", "fallback"}
 
 
-# --- LLM 实例 ---
+def _env_name(role: str, field: str) -> str:
+    return f"LLM_{role.upper()}_{field}"
 
-llm_mimo = LLM(
-    base_url=os.getenv("MIMO_BASE_URL", ""),
-    api_key=os.getenv("MIMO_API_KEY", ""),
-    model=os.getenv("MIMO_MODEL", ""),
-)
 
-llm_ds = LLM(
-    base_url=os.getenv("DS_BASE_URL", ""),
-    api_key=os.getenv("DS_API_KEY", ""),
-    model=os.getenv("DS_MODEL", ""),
-)
+def has_llm_config(role: str) -> bool:
+    """指定用途存在任意配置时返回 True。"""
+    if role not in LLM_ROLES:
+        raise ValueError(f"未知的 LLM 用途: {role!r}")
+    return any(
+        os.getenv(_env_name(role, field))
+        for field in ("BASE_URL", "API_KEY", "MODEL")
+    )
 
-# 新增示例：
-# llm_openai = LLM(
-#     base_url="https://api.openai.com/v1",
-#     api_key=os.getenv("OPENAI_API_KEY", ""),
-#     model="gpt-4o-mini",
-# )
+
+@lru_cache(maxsize=None)
+def get_llm_client(role: str) -> ChatOpenAI:
+    """从环境变量读取配置，按用途创建并缓存 LLM 客户端。"""
+    if role not in LLM_ROLES:
+        raise ValueError(f"未知的 LLM 用途: {role!r}")
+
+    base_url = os.getenv(_env_name(role, "BASE_URL")) or None
+    api_key = os.getenv(_env_name(role, "API_KEY"), "")
+    model = os.getenv(_env_name(role, "MODEL"), "")
+
+    missing = []
+    if not api_key:
+        missing.append(_env_name(role, "API_KEY"))
+    if not model:
+        missing.append(_env_name(role, "MODEL"))
+    if missing:
+        raise ValueError(f"缺少 LLM 环境变量: {', '.join(missing)}")
+
+    return ChatOpenAI(
+        model=model,
+        base_url=base_url,
+        api_key=SecretStr(api_key),
+        temperature=0,
+    )

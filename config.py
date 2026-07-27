@@ -8,16 +8,16 @@ load_dotenv()
 # 下载目录
 DOWNLOAD_DIR = Path(__file__).parent / "downloads"
 
+# 文件转移目标目录（可选；配置后在 TickTick 处理完成后移动下载文件）
+_move_target_dir = os.getenv("MOVE_TARGET_DIR")
+MOVE_TARGET_DIR = Path(_move_target_dir).expanduser() if _move_target_dir else None
+
 # 代理设置（从 .env 读取，可选）
 HTTP_PROXY = os.getenv("HTTP_PROXY")
 HTTPS_PROXY = os.getenv("HTTPS_PROXY")
 
 # GitHub API Token（可选；未配置时使用匿名请求）
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-
-# LLM 设置：指定主模型和 fallback 模型（对应 llms.py 中的变量名）
-LLM_PRIMARY = "llm_mimo"
-LLM_FALLBACK = "llm_ds"
 
 # 待办模块（下载完成后自动创建待办，可选）
 TODO_ENABLED = os.getenv("TODO_ENABLED", "false").lower() == "true"

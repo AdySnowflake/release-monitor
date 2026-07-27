@@ -24,7 +24,12 @@ def create_todo(repo_name: str, tag: str) -> bool:
     """
     title = f"{repo_name} - {tag}"
     content = "GitHub release monitor"
-    todo_date = datetime.now(TIMEZONE).date()
+    start_datetime = datetime.now(TIMEZONE).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
 
     token = config.TICKTICK_ACCESS_TOKEN
     project_id = config.TICKTICK_PROJECT_ID
@@ -36,7 +41,7 @@ def create_todo(repo_name: str, tag: str) -> bool:
         "title": title,
         "content": content,
         "projectId": project_id,
-        "startDate": todo_date.strftime("%Y-%m-%d"),
+        "startDate": start_datetime.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "isAllDay": True,
         "timeZone": "Asia/Shanghai",
     }
@@ -44,7 +49,7 @@ def create_todo(repo_name: str, tag: str) -> bool:
         "Authorization": f"Bearer {token}",
     }
 
-    logger.info(f"创建待办: {title} @ {todo_date.isoformat()}")
+    logger.info(f"创建待办: {title} @ {start_datetime.date().isoformat()}")
 
     try:
         resp = requests.post(
