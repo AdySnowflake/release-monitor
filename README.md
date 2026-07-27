@@ -146,7 +146,7 @@ ai_file_selector.py     # 根据规则选择 Release asset
 llms.py                 # LLM Provider 定义
 error_handler.py        # LLM 重试、回退和结果修复
 downloader.py           # 文件下载
-todo.py                 # TickTick 待办（可选）
+ticktick.py             # TickTick 待办（可选）
 config.example.py       # 业务配置示例
 repo_rules.example.json # 监控规则示例
 ```

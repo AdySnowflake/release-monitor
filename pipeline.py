@@ -5,7 +5,7 @@ from downloader import download_file
 from github_api import get_release_assets
 from ai_file_selector import select_file
 from repo_rules import get_repo_rules
-from todo import create_todo
+from ticktick import create_todo
 
 import llms
 import config
