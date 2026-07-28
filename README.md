@@ -71,6 +71,18 @@ uv run --locked python main.py
 
 运行日志会写入 `logs/pipeline_YYYYMMDD_HHMMSS.log`，下载文件默认保存在 `downloads/`。
 
+## 更新已有部署
+
+项目通过 Git 部署后，进入项目目录拉取最新代码并同步依赖：
+
+```bash
+cd /path/to/release-monitor
+git pull --ff-only
+uv sync --locked
+```
+
+程序每次由 cron 启动并执行一轮检查，不需要重启常驻服务。下一轮任务会自动使用更新后的代码。
+
 ## 配置 LLM
 
 主模型用于选择 Release asset，也是错误分析的首选模型：
