@@ -35,33 +35,33 @@ USER_PROMPT = """Assets 列表:
 def build_chain(llm: BaseChatModel):
     parser = JsonOutputParser()
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        ("user", USER_PROMPT),
-    ]).partial(format_instructions=parser.get_format_instructions())
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT),
+            ("user", USER_PROMPT),
+        ]
+    ).partial(format_instructions=parser.get_format_instructions())
 
     return prompt | llm | parser
 
 
 def _invoke_with_retry(role: str, input_data: dict, max_retries: int = 2) -> dict:
     """创建指定用途的客户端并带退避重试调用。"""
-    llm = get_llm_client(role)
-    chain = build_chain(llm)
+    total_attempts = max_retries + 1
+    chain = build_chain(get_llm_client(role))
 
-    for attempt in range(max_retries + 1):
+    for attempt in range(1, total_attempts + 1):
         try:
             return chain.invoke(input_data)
         except Exception as error:
-            if attempt == max_retries:
+            if attempt == total_attempts:
                 raise
-            wait = 2 ** attempt
+            wait = 2 ** (attempt - 1)
             logger.warning(
                 f"LLM {role!r} 调用失败，{wait}s 后重试 "
-                f"({attempt + 1}/{max_retries}): {error}"
+                f"({attempt}/{total_attempts}): {error}"
             )
             time.sleep(wait)
-
-    raise RuntimeError("LLM 重试流程异常结束")
 
 
 def select_file(assets: list[dict], rules: dict) -> dict:
@@ -75,18 +75,31 @@ def select_file(assets: list[dict], rules: dict) -> dict:
         result = _invoke_with_retry("primary", input_data)
     except Exception as error:
         if not has_llm_config("fallback"):
-            logger.error(f"主 LLM 调用失败: {error}")
-            return {"success": 0, "error": "llm_failed"}
+            error_log = f"主 LLM 调用失败: {type(error).__name__}: {error}"
+            logger.error(error_log)
+            return {
+                "success": 0,
+                "error": "llm_failed",
+                "error_log": error_log,
+            }
 
         logger.warning(f"主 LLM 调用失败，切换备用 LLM: {error}")
         try:
             result = _invoke_with_retry("fallback", input_data)
         except Exception as fallback_error:
-            logger.error(f"备用 LLM 调用失败: {fallback_error}")
-            return {"success": 0, "error": "all_llms_failed"}
+            error_log = (
+                "备用 LLM 调用失败: "
+                f"{type(fallback_error).__name__}: {fallback_error}"
+            )
+            logger.error(error_log)
+            return {
+                "success": 0,
+                "error": "all_llms_failed",
+                "error_log": error_log,
+            }
 
-    if result.get("success") == 1:
-        logger.debug(f"AI 调用成功: {json.dumps(result, ensure_ascii=False)}")
-    else:
-        logger.warning(f"AI 未选择文件: {json.dumps(result, ensure_ascii=False)}")
+    if result.get("success") != 1:
+        error_log = "AI 未选择文件：模型返回 success=0"
+        logger.warning(error_log)
+        result.setdefault("error_log", error_log)
     return result

@@ -60,8 +60,7 @@ def create_todo(repo_name: str, tag: str) -> bool:
             timeout=10,
         )
         resp.raise_for_status()
-        result = resp.json()
-        logger.info(f"待办创建成功: {result.get('id')}")
+        logger.info("待办创建成功")
         return True
     except requests.RequestException as e:
         logger.error(f"待办创建失败: {e}")

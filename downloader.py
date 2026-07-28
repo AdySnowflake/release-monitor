@@ -8,7 +8,7 @@ from config import DOWNLOAD_DIR, get_proxies
 logger = logging.getLogger(__name__)
 
 
-def download_file(url: str, download_dir: Path | None = None) -> Path | None:
+def download_file(url: str, download_dir: Path | None = None) -> Path:
     """下载文件到指定目录。
 
     Args:
@@ -16,7 +16,7 @@ def download_file(url: str, download_dir: Path | None = None) -> Path | None:
         download_dir: 下载目录，默认 ./downloads/
 
     Returns:
-        Path: 下载后的文件路径，失败返回 None
+        Path: 下载后的文件路径；失败时抛出请求或文件系统异常
     """
     download_dir = download_dir or DOWNLOAD_DIR
     download_dir.mkdir(parents=True, exist_ok=True)
@@ -42,8 +42,7 @@ def download_file(url: str, download_dir: Path | None = None) -> Path | None:
 
             with open(temp_filepath, "wb") as f:
                 for chunk in resp.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
+                    f.write(chunk)
 
         temp_filepath.replace(filepath)
     except Exception:

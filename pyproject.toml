@@ -5,8 +5,7 @@ description = "监控 GitHub Release，通过 AI 自动筛选并下载对应平�
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "openai",
-    "langchain",
+    "langchain-core",
     "langchain-openai",
     "requests",
     "python-dotenv",
