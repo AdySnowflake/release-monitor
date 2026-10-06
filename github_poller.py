@@ -4,7 +4,13 @@ from dataclasses import dataclass
 import requests
 
 from config import get_github_headers, get_proxies
-from repo_rules import load_rules
+from repo_rules import (
+    clear_failure_state,
+    is_backing_off,
+    is_disabled,
+    load_rules,
+    record_failure,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,22 +27,32 @@ class ReleaseInfo:
     assets: list[dict]
 
 
-def check_new_releases() -> tuple[list[ReleaseInfo], list[dict]]:
-    """遍历 repo_rules.json，返回新版本和检查失败记录。"""
+def check_new_releases() -> tuple[list[ReleaseInfo], list[dict], list[dict]]:
+    """遍历 repo_rules.json，返回新版本、检查失败记录和自动禁用事件。"""
     rules = load_rules()
     new_releases: list[ReleaseInfo] = []
     failures: list[dict] = []
+    auto_disabled: list[dict] = []
 
     for repo_key in rules:
+        rule = rules[repo_key]
+        if is_disabled(rule):
+            logger.info(f"仓库 {repo_key} 已禁用，跳过")
+            continue
+        if is_backing_off(rule):
+            logger.info(
+                f"仓库 {repo_key} 失败退避中，"
+                f"{rule.get('next_check_after')} 前暂不检查"
+            )
+            continue
+
         try:
             owner, repo = repo_key.split("/")
             release_info = _check_repo(
                 owner,
                 repo,
-                rules[repo_key].get("last_tag"),
+                rule.get("last_tag"),
             )
-            if release_info:
-                new_releases.append(release_info)
         except Exception as error:
             error_log = (
                 f"检查仓库 {repo_key!s} 失败: "
@@ -51,12 +67,22 @@ def check_new_releases() -> tuple[list[ReleaseInfo], list[dict]]:
                     "error_log": error_log,
                 }
             )
+            disabled_event = record_failure(owner, repo, error_log=error_log)
+            if disabled_event:
+                auto_disabled.append(disabled_event)
+            continue
+
+        if release_info:
+            new_releases.append(release_info)
+        else:
+            clear_failure_state(owner, repo)
 
     logger.info(
         f"检查完成，发现 {len(new_releases)} 个新 release，"
-        f"{len(failures)} 个仓库检查失败"
+        f"{len(failures)} 个仓库检查失败，"
+        f"{len(auto_disabled)} 个仓库被自动禁用"
     )
-    return new_releases, failures
+    return new_releases, failures, auto_disabled
 
 
 def _check_repo(

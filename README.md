@@ -121,7 +121,10 @@ LLM_FALLBACK_MODEL=your-fallback-model
     "extension": ".apk",
     "include": ["arm64-v8a"],
     "exclude": ["legacy"],
-    "last_tag": null
+    "last_tag": null,
+    "disabled": false,
+    "consecutive_failures": 0,
+    "next_check_after": null
   }
 }
 ```
@@ -134,12 +137,15 @@ LLM_FALLBACK_MODEL=your-fallback-model
 | `include` | string[] | 文件名应包含的关键词 |
 | `exclude` | string[] | 文件名不能包含的关键词 |
 | `last_tag` | string/null | 最后成功处理的 tag，由程序自动维护 |
+| `disabled` | boolean | 禁用开关：设为 `true` 后跳过该仓库；连续失败自动禁用也写此字段；写成其他类型视为非法配置 |
+| `consecutive_failures` | number | 连续失败次数，由程序自动维护，成功后移除 |
+| `next_check_after` | string/null | 失败退避截止时间（ISO 8601，上海时区），由程序自动维护，早于该时间不检查 |
 
 仓库键必须采用 `owner/repo` 格式。`extension`、`include` 和 `exclude` 可以省略；规则会连同 GitHub 返回的 assets 一起交给 LLM 判断。
 
 程序比较的是 GitHub “latest release”的 tag 与 `last_tag` 是否相同，不进行语义化版本排序。首次运行时 `last_tag` 可设为 `null`，此时会处理当前最新 Release。
 
-`repo_rules.json` 缺失或 JSON 无效会终止本轮检查，并在飞书已配置时发送错误通知；空对象 `{}` 表示暂时没有需要监控的仓库。
+`repo_rules.json` 缺失或 JSON 无效会终止本轮检查，并在飞书已配置时发送错误通知；字段取值非法（如 `disabled` 不是布尔值）同样终止本轮并发送错误通知；空对象 `{}` 表示暂时没有需要监控的仓库。
 
 需要整理规则文件顺序时运行：
 
@@ -148,6 +154,23 @@ uv run --locked python sort_repo_rules.py
 ```
 
 该脚本按仓库名（`/` 后面的部分）进行不区分大小写的排序，不会改动规则内容。
+
+### 失败退避与自动禁用
+
+程序会按仓库记录连续失败次数（GitHub 检查失败和 release 处理失败都计入），并在两次检查之间做指数退避：
+
+| 情形 | 行为 |
+| --- | --- |
+| `disabled` 为 `true` | 跳过该仓库，不发起 GitHub 请求 |
+| 当前时间早于 `next_check_after` | 退避跳过，不计数也不清零 |
+| 检查或处理失败（第 1、2 次） | 计数 +1，`next_check_after` 设为当前时间加 `1h × 2^(次数-1)`（即 1 小时、2 小时） |
+| 检查或处理失败（第 3 次） | 移除计数字段并写入 `disabled: true`，发送飞书自动禁用告警 |
+| 检查成功且无新 release | 移除 `consecutive_failures` 和 `next_check_after` |
+| 处理成功 | 更新 `last_tag`，并同上清除失败状态 |
+
+按 30 分钟 cron 为例：第 1 次失败后约 1 小时重试，第 2 次后约 2 小时，第 3 次失败即自动禁用并通知，累计约 3 小时。短时故障（如网络抖动）通常在恢复后的一轮"检查成功且无新 release"时自动清零，不会积累到禁用阈值。
+
+被自动禁用的仓库不会自行恢复。修复问题后，将 `repo_rules.json` 中该仓库的 `disabled` 改回 `false` 或删除该字段即可恢复监控；急用时也可同时删除 `next_check_after`。失败期间 `last_tag` 不会更新，恢复后的下一轮会重新处理未成功的 release。
 
 ## 配置飞书错误通知
 
@@ -169,6 +192,8 @@ FEISHU_SIGNING_SECRET=your-signing-secret
 - AI 给出的分析内容（仅分析成功时）。
 
 告警不在通知层翻译错误码或生成错误描述，不定义程序中不存在的严重级别或运行状态，也不会展示重试次数、内部错误码或 JSON。错误记录会提供给 AI 分析，本地日志保留完整异常。
+
+仓库因连续失败 3 次被自动禁用时，会额外发送一张红色卡片，标题为 `Release Monitor 自动禁用告警`，内容包含仓库与 tag、触发原因、最近错误日志以及恢复方法，走同一 Webhook 渠道。
 
 以下情况不会阻止错误通知：
 
@@ -255,7 +280,7 @@ llms.py                  # 按角色惰性创建 LLM 客户端
 downloader.py            # 流式下载和临时文件处理
 file_transfer.py         # 可选的下载文件移动
 ticktick.py              # 可选的 TickTick 待办
-repo_rules.py            # 规则读取、保存与 last_tag 更新
+repo_rules.py            # 规则读取、保存、last_tag 更新与失败退避/自动禁用
 sort_repo_rules.py       # 整理 repo_rules.json 顺序
 config.py                # 从环境变量生成运行配置
 .env.example             # 环境变量模板

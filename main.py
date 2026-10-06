@@ -10,10 +10,10 @@ sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
 
 import config
 from error_analysis import generate_error_report
-from error_notification import send_error_notification
+from error_notification import send_auto_disable_notification, send_error_notification
 from github_poller import check_new_releases
 from pipeline import run_release
-from repo_rules import update_repo_tag
+from repo_rules import clear_failure_state, record_failure, update_repo_tag
 
 NOISY_LOGGERS = ("httpcore", "httpx", "openai", "urllib3")
 
@@ -71,13 +71,36 @@ def _notify_failures(error_records: list[dict]) -> None:
     send_error_notification(error_records, ai_report)
 
 
+def _record_processing_failure(
+    release,
+    error_log: str | None,
+    auto_disabled: list[dict],
+) -> None:
+    """记录一次处理失败，触发自动禁用时收集事件。"""
+    event = record_failure(
+        release.owner,
+        release.repo,
+        tag=release.tag,
+        error_log=error_log,
+    )
+    if event:
+        auto_disabled.append(event)
+
+
+def _notify_auto_disabled(events: list[dict]) -> None:
+    """连续失败触发自动禁用时发送飞书通知。"""
+    if not events:
+        return
+    send_auto_disable_notification(events)
+
+
 def main():
     """遍历仓库，通过 GitHub API 检查并处理新 release。"""
     setup_logging()
     logger.info("检查 GitHub 仓库的新 release")
 
     try:
-        new_releases, failures = check_new_releases()
+        new_releases, failures, auto_disabled = check_new_releases()
     except Exception as error:
         logger.exception("检查 GitHub release 失败")
         _notify_failures(
@@ -94,6 +117,7 @@ def main():
     if not new_releases:
         logger.info("未发现可处理的新 release")
         _notify_failures(failures)
+        _notify_auto_disabled(auto_disabled)
         return
 
     logger.info(f"发现 {len(new_releases)} 个新 release")
@@ -108,6 +132,7 @@ def main():
 
             if result.get("success") == 1:
                 update_repo_tag(release.owner, release.repo, release.tag)
+                clear_failure_state(release.owner, release.repo)
             else:
                 logger.error(
                     f"处理 {release.owner}/{release.repo} @ {release.tag} 未成功，"
@@ -122,6 +147,9 @@ def main():
                         "error_log": result.get("error_log"),
                     }
                 )
+                _record_processing_failure(
+                    release, result.get("error_log"), auto_disabled
+                )
         except Exception as e:
             logger.exception(f"处理 {release.owner}/{release.repo} 失败")
             failures.append(
@@ -133,8 +161,10 @@ def main():
                     "message": str(e),
                 }
             )
+            _record_processing_failure(release, str(e), auto_disabled)
 
     _notify_failures(failures)
+    _notify_auto_disabled(auto_disabled)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,11 @@ from ticktick import create_todo
 
 logger = logging.getLogger(__name__)
 
+# 传给 AI 选择器时剔除的程序运维字段，提示词只关心筛选规则本身
+BOOKKEEPING_RULE_KEYS = frozenset(
+    {"last_tag", "disabled", "consecutive_failures", "next_check_after"}
+)
+
 
 class StepLogger:
     """流水线步骤日志器。"""
@@ -90,7 +95,14 @@ def _process_release_assets(
 
     # [3/4] AI 选择文件
     with StepLogger(3, total_steps, "AI 选择文件") as step:
-        file_result = select_file(assets=assets, rules=rules)
+        file_result = select_file(
+            assets=assets,
+            rules={
+                key: value
+                for key, value in rules.items()
+                if key not in BOOKKEEPING_RULE_KEYS
+            },
+        )
         step.log(json.dumps(file_result, ensure_ascii=False, indent=2))
         if file_result.get("success") != 1:
             error_log = file_result.get("error_log") or (

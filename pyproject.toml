@@ -3,7 +3,7 @@ name = "release-monitor"
 version = "1.1.1"
 description = "监控 GitHub Release，通过 AI 自动筛选并下载对应平台的发布文件"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12, <3.13"
 dependencies = [
     "langchain-core",
     "langchain-openai",
